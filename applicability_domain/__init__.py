@@ -1,1 +1,1 @@
-from applicability_domain import ApplicabilityDomain
+from .applicability_domain import ApplicabilityDomain
