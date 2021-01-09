@@ -5,10 +5,6 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from scipy.spatial.distance import cdist
 from math import floor
 
-# 例用
-from sklearn.datasets import load_boston
-from sklearn.model_selection import train_test_split
-
 def get_distance(XA, XB, sort = True):
     distance = cdist(XA, XB, metric = 'euclidean')    # ユークリッド距離を行ベクトルごとに算出する．distance.shape[0] == len(XA), distance.shape[1] == len(XB)
     if sort:
@@ -73,11 +69,22 @@ class ApplicabilityDomain:
 
 
 if __name__ == '__main__':
+    from sklearn.datasets import load_boston
+    from sklearn.model_selection import train_test_split
+
+    # サンプルデータ
     boston = load_boston()
     X = pd.DataFrame(boston['data'], columns = boston['feature_names'])
     y = pd.Series(boston['target'], name = 'PRICE')
+
+    # train_test_split
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 1234)
 
+    # インスタンス生成
     AD = ApplicabilityDomain(k = 5, alpha = 0.95)
+
+    # applicable_domainの中ならTrueになっているnp.ndarrayを返している．
     boolean_train, boolean_test = AD.is_inside(X_train, X_test)
     print(X_train[boolean_train])
+
+    AD.get_ratio_distance(X_train, X_test)
