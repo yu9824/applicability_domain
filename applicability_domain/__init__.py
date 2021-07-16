@@ -8,7 +8,7 @@ __author__       = 'yu9824'
 __copyright__    = 'Copyright © 2021 yu9824'
 __author_email__ = 'yu.9824.job@gmail.com'
 __user_id__ = 'yu9824'
-__app_name__ = 'template'
+__app_name__ = 'applicability_domain'
 __url__ = 'http://github.com/yu9824/applicability_domain/'
 
 __all__ = [
