@@ -20,12 +20,8 @@ ad.fit(X_train)
 X_test_inlier = ad.transform(X_test)
 ```
 
-## Reference
-### Paper
-* https://www.sciencedirect.com/science/article/abs/pii/S0169743917305919?via%3Dihub
-
+## References
 ### Sites
-* https://github.com/hkaneko1985/ensemble_outlier_sample_detection
 * https://datachemeng.com/applicabilitydomain/
 
 
