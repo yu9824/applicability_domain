@@ -1,90 +1,142 @@
-import numpy as np
-import pandas as pd
+'''
+Copyright © 2021 yu9824
+'''
 
+import numpy as np
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.base import TransformerMixin, BaseEstimator
+from sklearn.utils.validation import check_array, check_is_fitted
 from scipy.spatial.distance import cdist
 from math import floor
 
-def get_distance(XA, XB, sort = True):
-    distance = cdist(XA, XB, metric = 'euclidean')    # ユークリッド距離を行ベクトルごとに算出する．distance.shape[0] == len(XA), distance.shape[1] == len(XB)
-    if sort:
-        distance.sort()
-    return distance
 
-def get_kNN_distance(XA, XB, k = 5, sort = True):
-    distance_sorted = get_distance(XA, XB, sort = True)
-    kNN_distance = np.mean(distance_sorted[:, :k+1], axis = 1)    # 周辺k個の点との距離の平均をkNN距離と定義
-    if sort:
-        kNN_distance.sort()
-    arg = np.argsort(kNN_distance)  # 距離が近い順のindexをnp.ndarrayで返す
-    return kNN_distance, arg
+class ApplicabilityDomainDetector(BaseEstimator, TransformerMixin):
+    def __init__(self, k=5, alpha=0.95, scaler=StandardScaler()):
+        """
 
-class ApplicabilityDomain:
-    def __init__(self, k = 5, alpha = 0.95):
-        self.k_in_kNN = k
-        self.ratio = alpha
+        Parameters
+        ----------
+        k : int, optional
+            `k` nearest neighbors, by default 5
+        alpha : float, optional
+            0~1. ratio of inlier sample, by default 0.95
+        scaler : scikit-learn scaler instance like sklearn.preprocessing.StandardScaler(), optional
+            , by default StandardScaler()
+        """
+        super().__init__()
+        self.k = k
+        self.alpha = alpha
+        self.scaler = scaler
 
-        '''
-        scaler: MinMaxScaler() or StandardScaler()
-        '''
+    def fit(self, X, y=None):
+        """
 
-    def get_ratio_distance(self, train, test, scaler = StandardScaler()):
-        train = np.array(train)
-        test = np.array(test)
+        Parameters
+        ----------
+        X : 
+        y : You don't how to enter, optional
+            , by default None
 
-        if train.shape[1] != test.shape[1]:
-            raise ValueError("Either or Both of the inputs is/are not correct.")
+        Returns
+        -------
+        [type]
+            [description]
+        """
+        # check
+        X = check_array(X)
 
-        # それぞれ標準化 or 正規化
-        train_normalized = scaler.fit_transform(train)
-        test_normalized = scaler.transform(test)
+        # normalize
+        self.train_normalized_ = self.scaler.fit_transform(X)
 
         # train内でのkNN距離を求める．
-        kNN_train_distance, arg_train = get_kNN_distance(train_normalized, train_normalized, k = self.k_in_kNN, sort = False)
-        kNN_train_distance_sorted = np.sort(kNN_train_distance)
+        self.kNN_train_distance_, self.arg_train_ = self._get_kNN_distance(self.train_normalized_, self.train_normalized_, k = self.k, sort = False)
+        kNN_train_distance_sorted_ = np.sort(self.kNN_train_distance_)
 
         # これより遠いと自信なくなるよ，の敷居を求める．
-        threshold = kNN_train_distance_sorted[floor(kNN_train_distance_sorted.shape[0] * self.ratio) - 1]
+        self.threshold_ = kNN_train_distance_sorted_[floor(kNN_train_distance_sorted_.shape[0] * self.alpha) - 1]
+        return self
+
+    def transform(self, X):
+        """
+
+        Parameters
+        ----------
+        X : 
+
+        Returns
+        -------
+        np.ndarray (transformed X)
+        """
+        self.get_support(X)
+        return X[self.support_]
+
+    def get_support(self, X):
+        """
+
+        Parameters
+        ----------
+        X : 
+
+        Returns
+        -------
+        np.ndarray (boolean)
+        """
+        self.get_ratio_distance(X)
+        self.support_ = self.ratio_distance_ <= 1
+        return self.support_
+
+    def get_ratio_distance(self, X):
+        """
+
+        Parameters
+        ----------
+        X : 
+
+        Returns
+        -------
+        np.ndarray
+
+        Raises
+        ------
+        ValueError
+            If you enter an array with a different number of features, it will return an error.
+        """
+        # check_is_fitted
+        check_is_fitted(self, 'threshold_')
+
+        # check
+        X = check_array(X)
+
+        # normalize
+        self.test_normalized_ = self.scaler.transform(X)
+
+        # 
+        if self.test_normalized_.shape[1] != self.train_normalized_.shape[1]:
+            raise ValueError("Either or Both of the inputs is/are not correct.")
 
         # trainとtestのkNN距離を算出
-        kNN_train_test_distance, arg_train_test = get_kNN_distance(test_normalized, train_normalized, k = self.k_in_kNN, sort = False)
-
-        # # 求めた敷居より近い位置にあるtestデータの番号 (index) をnp.ndarrayで取得
-        # boolean = kNN_train_test_distance <= threshold
+        self.kNN_train_test_distance_, self.arg_train_test_ = self._get_kNN_distance(self.test_normalized_, self.train_normalized_, k = self.k, sort = False)
 
         # 敷居に対してどれくらいの割合なのか．（self.sample_numberを連続数化するための処理）
         # 小さければ小さいほど密度が高い→信頼度が高い．
-        ratio_distance_train = kNN_train_distance / threshold
-        ratio_distance_train_test = kNN_train_test_distance / threshold
-
-        return ratio_distance_train, ratio_distance_train_test
+        self.ratio_distance_ = self.kNN_train_test_distance_ / self.threshold_
+        return self.ratio_distance_
 
 
-    def is_inside(self, *args):
-        return list(map(lambda x:x<=1, self.get_ratio_distance(*args)))
+    def _get_distance(self, XA, XB, sort = True):
+        distance = cdist(XA, XB, metric = 'euclidean')    # ユークリッド距離を行ベクトルごとに算出する．distance.shape[0] == len(XA), distance.shape[1] == len(XB)
+        if sort:
+            distance.sort()
+        return distance
 
-
-
-
+    def _get_kNN_distance(self, XA, XB, k = 5, sort = True):
+        distance_sorted = self._get_distance(XA, XB, sort = True)
+        kNN_distance = np.mean(distance_sorted[:, :k+1], axis = 1)    # 周辺k個の点との距離の平均をkNN距離と定義
+        if sort:
+            kNN_distance.sort()
+        arg = np.argsort(kNN_distance)  # 距離が近い順のindexをnp.ndarrayで返す
+        return kNN_distance, arg
 
 
 if __name__ == '__main__':
-    from sklearn.datasets import load_boston
-    from sklearn.model_selection import train_test_split
-
-    # サンプルデータ
-    boston = load_boston()
-    X = pd.DataFrame(boston['data'], columns = boston['feature_names'])
-    y = pd.Series(boston['target'], name = 'PRICE')
-
-    # train_test_split
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 1234)
-
-    # インスタンス生成
-    AD = ApplicabilityDomain(k = 5, alpha = 0.95)
-
-    # applicable_domainの中ならTrueになっているnp.ndarrayを返している．
-    boolean_train, boolean_test = AD.is_inside(X_train, X_test)
-    print(X_train[boolean_train])
-
-    AD.get_ratio_distance(X_train, X_test)
+    pass
