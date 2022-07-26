@@ -2,7 +2,7 @@
 
 from .applicability_domain import *
 
-__version__      = '0.1.0'
+__version__      = '0.1.1dev'
 __license__      = 'Apache License 2.0'
 __author__       = 'yu9824'
 __copyright__    = 'Copyright © 2021 yu9824'
